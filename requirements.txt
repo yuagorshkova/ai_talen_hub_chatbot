@@ -1,0 +1,11 @@
+python-telegram-bot
+aiohttp
+GitPython
+langchain_core
+langchain_gigachat
+langgraph
+omegaconf
+pandas
+python-dotenv
+Requests
+typing_extensions
