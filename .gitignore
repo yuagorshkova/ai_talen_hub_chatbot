@@ -5,6 +5,8 @@
 
 # Cache
 __pycache__/
+venv/
+.DS_Store
 *.py[cod]
 obs*
 *zip
