@@ -19,7 +19,7 @@ class GigaChatAuth(TypedDict):
 
 gigachat_config: GigaChatConfig = {
     "model": os.getenv("MODEL", "GigaChat-2-Max"),
-    "profanity_check": os.getenv("PROFANITY_CHECK", "false").lower() == "true",
+    "profanity_check": os.getenv("PROFANITY_CHECK", "true").lower() == "true",
     "base_url": os.getenv("GIGACHAT_BASE_URL", "https://gigachat.sberdevices.ru/v1"),
     "timeout": int(os.getenv("GIGACHAT_TIMEOUT", "30")),
 }

@@ -1,90 +1,52 @@
 import os
-from dotenv import load_dotenv
+import logging
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
-from src.graph import app
+
+from src.graph import workflow
 from langchain_core.messages import HumanMessage
 
-load_dotenv()
+# Setup basic logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 
-async def start(update: Update, context):
-    """Start a new conversation with fresh context"""
-    user_id = str(update.effective_user.id)
-    print(f"Starting new conversation for user {user_id}")
-    
-    # Clear any existing conversation
-    try:
-        await app.acheckpointer.adelete_thread({"configurable": {"thread_id": user_id}})
-        print(f"Cleared previous conversation state for user {user_id}")
-    except Exception as e:
-        print(f"Error clearing conversation state for user {user_id}: {str(e)}")
-    
-    await update.message.reply_text("Hello! I'm your AI assistant. How can I help you today?")
-    print(f"Sent welcome message to user {user_id}")
+async def start(update: Update, _):
+    user_id = update.effective_user.id
+    logger.info(f"New session started for user {user_id}")
+    await update.message.reply_text("Привет! Я бот-помощник по вопросам о программах магистратуры AI Talent Hub :) Чем могу помочь?")
 
-async def handle_message(update: Update, context):
-    """Process user messages with conversation context"""
+async def handle_message(update: Update, _):
+    user_id = update.effective_user.id
     user_message = update.message.text
-    user_id = str(update.effective_user.id)
-    
-    print(f"Received message from user {user_id}: '{user_message}'")
-    
-    # Prepare the conversation thread
-    thread = {"configurable": {"thread_id": user_id}}
+    logger.info(f"Message from user {user_id}: {user_message[:50]}...")  # Log first 50 chars
     
     try:
-        # Get current conversation state if exists
-        print(f"Getting conversation state for user {user_id}")
-        current_state = await app.acheckpointer.aget(thread)
+        logger.debug("Invoking LangGraph...")
+        response = await workflow.ainvoke(
+            {"messages": [HumanMessage(content=user_message)]},
+            {"configurable": {"thread_id": str(user_id)}}
+        )
         
-        if current_state:
-            print(f"Found existing conversation state with {len(current_state['values']['messages'])} messages")
-        else:
-            print("No existing conversation state found - starting fresh")
-        
-        # Prepare input with history
-        inputs = {
-            "messages": [
-                *([] if not current_state else current_state["values"]["messages"]),
-                HumanMessage(content=user_message)
-            ]
-        }
-        
-        print("Processing message through LangGraph...")
-        result = await app.ainvoke(inputs, thread)
-        print("Successfully processed message")
-        
-        # Get the last AI response
-        ai_response = result["messages"][-1].content
-        print(f"Sending response to user {user_id}: '{ai_response[:50]}...'")
-        
+        ai_response = response['messages'][-1].content
+        logger.debug(f"Generated response: {ai_response[:50]}...")
         await update.message.reply_text(ai_response)
-        print("Response sent successfully")
         
     except Exception as e:
-        print(f"Error processing message: {str(e)}")
-        await update.message.reply_text("Sorry, I encountered an error. Let's start fresh.")
-        await start(update, context)  # Reset conversation
+        logger.error(f"Error processing message: {str(e)}", exc_info=True)
+        await update.message.reply_text("Error occurred. Restarting...")
+        await start(update, None)
 
 def main():
-    print("Initializing Telegram bot application...")
+    logger.info("Starting bot application...")
     application = Application.builder().token(TOKEN).build()
-    
-    # Add handlers
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(
-        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message)
-    )
-    
-    print("Bot is starting polling...")
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    logger.info("Bot is running and polling...")
     application.run_polling()
-    print("Bot is now running")
 
 if __name__ == '__main__':
-    print("Starting bot application...")
-    try:
-        main()
-    except Exception as e:
-        print(f"Fatal error in bot application: {str(e)}")
-        raise
+    main()
