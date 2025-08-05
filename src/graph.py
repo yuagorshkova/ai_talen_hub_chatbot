@@ -3,7 +3,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import START, MessagesState, StateGraph
 
-from context import csv_loader
+from src.context import academic_loader
 from src.gigachat import gigachat
 
 model = gigachat
@@ -20,7 +20,7 @@ async def call_model(state: MessagesState):
     system_prompt = f"""
     You are a helpful customer support assistant. Use this context to answer questions:
     
-    {csv_loader.get_full_context()}
+    {academic_loader.get_plan_context()}
     
     Current conversation:
     """

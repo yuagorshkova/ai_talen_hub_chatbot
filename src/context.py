@@ -1,22 +1,37 @@
 from pathlib import Path
-from typing import Dict, List, Optional
-
+from typing import Dict, List, Optional, Union
 import pandas as pd
 
 
 class AcademicPlanLoader:
     def __init__(self):
-        self.ai_plan = self._load_academic_plan("resources/academic_plan_ai.csv")
-        self.ai_product_plan = self._load_academic_plan(
-            "resources/academic_plan_ai_product.csv"
-        )
-        self._validate_plans()
+        # Пытаемся загрузить сначала CSV, потом MD
+        self.ai_plan = self._load_data("resources/academic_plan_ai")
+        self.ai_product_plan = self._load_data("resources/academic_plan_ai_product")
 
-    def _load_academic_plan(self, path: str) -> List[Dict]:
+    def _load_data(self, base_path: str) -> Union[List[Dict], str, None]:
+        """Пытается загрузить данные сначала из CSV, потом из MD"""
+        csv_path = f"{base_path}.csv"
+        md_path = f"{base_path}.md"
+        
+        # Пробуем CSV
+        csv_data = self._load_academic_plan(csv_path)
+        if csv_data:
+            return csv_data
+            
+        # Если CSV нет, пробуем MD
+        if Path(md_path).exists():
+            print("Successfully loadeded plans")
+            return self._load_markdown_as_text(md_path)
+            
+        print(f"Warning: No academic plan found at {base_path}.[csv|md]")
+        return None
+
+    def _load_academic_plan(self, path: str) -> Optional[List[Dict]]:
         """Load and validate academic plan CSV with specific expected columns"""
         try:
             if not Path(path).exists():
-                raise FileNotFoundError(f"Academic plan file not found: {path}")
+                return None
 
             df = pd.read_csv(path)
 
@@ -38,47 +53,42 @@ class AcademicPlanLoader:
 
         except Exception as e:
             print(f"Error loading academic plan {path}: {e}")
-            return []
+            return None
 
-    def _validate_plans(self):
-        """Validate relationships between plans"""
-        if self.ai_plan and self.ai_product_plan:
-            ai_codes = {course["course_code"] for course in self.ai_plan}
-            product_codes = {course["course_code"] for course in self.ai_product_plan}
+    def _load_markdown_as_text(self, path: str) -> str:
+        """Загружает markdown файл как простой текст"""
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                return f.read()
+        except Exception as e:
+            print(f"Error loading markdown file {path}: {e}")
+            return ""
 
-            # Check for overlapping courses
-            overlaps = ai_codes & product_codes
-            if overlaps:
-                print(f"Warning: Overlapping course codes between plans: {overlaps}")
-
-    def get_course_info(self, course_code: str) -> Optional[Dict]:
-        """Get course details from either plan by course code"""
-        for course in self.ai_plan + self.ai_product_plan:
-            if course["course_code"].lower() == course_code.lower():
-                return course
-        return None
-
-    def get_semester_plan(self, semester: int, plan_type: str = "ai") -> List[Dict]:
-        """Get courses for specific semester"""
-        plan = self.ai_plan if plan_type == "ai" else self.ai_product_plan
-        return [c for c in plan if c["semester"] == semester]
 
     def get_plan_context(self, plan_type: str = "both") -> str:
-        """Generate formatted context string for LLM prompts"""
+        """Главный метод - возвращает контекст для LLM в виде строки"""
         context = []
 
-        if plan_type in ("ai", "both") and self.ai_plan:
-            context.append("=== AI ACADEMIC PLAN ===")
-            context.extend(self._format_course(c) for c in self.ai_plan)
+        if plan_type in ("ai", "both"):
+            if isinstance(self.ai_plan, list):
+                context.append("=== AI ACADEMIC PLAN ===")
+                context.extend(self._format_course(c) for c in self.ai_plan)
+            elif isinstance(self.ai_plan, str):
+                context.append("=== AI ACADEMIC PLAN (MARKDOWN) ===")
+                context.append(self.ai_plan)
 
-        if plan_type in ("product", "both") and self.ai_product_plan:
-            context.append("\n=== AI PRODUCT ACADEMIC PLAN ===")
-            context.extend(self._format_course(c) for c in self.ai_product_plan)
+        if plan_type in ("product", "both"):
+            if isinstance(self.ai_product_plan, list):
+                context.append("\n=== AI PRODUCT ACADEMIC PLAN ===")
+                context.extend(self._format_course(c) for c in self.ai_product_plan)
+            elif isinstance(self.ai_product_plan, str):
+                context.append("\n=== AI PRODUCT ACADEMIC PLAN (MARKDOWN) ===")
+                context.append(self.ai_product_plan)
 
         return "\n".join(context) if context else "No academic plans available"
 
     def _format_course(self, course: Dict) -> str:
-        """Format individual course for display"""
+        """Format individual course for display (только для CSV данных)"""
         return (
             f"{course['course_code']}: {course['course_name']} "
             f"(Semester {course['semester']}, {course['credits']} credits)\n"
