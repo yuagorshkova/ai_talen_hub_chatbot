@@ -1,5 +1,6 @@
 from pathlib import Path
 from typing import Dict, List, Optional, Union
+
 import pandas as pd
 
 
@@ -13,17 +14,17 @@ class AcademicPlanLoader:
         """Пытается загрузить данные сначала из CSV, потом из MD"""
         csv_path = f"{base_path}.csv"
         md_path = f"{base_path}.md"
-        
+
         # Пробуем CSV
         csv_data = self._load_academic_plan(csv_path)
         if csv_data:
             return csv_data
-            
+
         # Если CSV нет, пробуем MD
         if Path(md_path).exists():
             print("Successfully loadeded plans")
             return self._load_markdown_as_text(md_path)
-            
+
         print(f"Warning: No academic plan found at {base_path}.[csv|md]")
         return None
 
@@ -58,12 +59,11 @@ class AcademicPlanLoader:
     def _load_markdown_as_text(self, path: str) -> str:
         """Загружает markdown файл как простой текст"""
         try:
-            with open(path, 'r', encoding='utf-8') as f:
+            with open(path, "r", encoding="utf-8") as f:
                 return f.read()
         except Exception as e:
             print(f"Error loading markdown file {path}: {e}")
             return ""
-
 
     def get_plan_context(self, plan_type: str = "both") -> str:
         """Главный метод - возвращает контекст для LLM в виде строки"""
