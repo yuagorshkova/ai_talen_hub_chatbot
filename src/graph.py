@@ -44,7 +44,6 @@ def create_graph():
 
     return workflow.compile(
         checkpointer=memory,
-        interrupt_before=["model"],
     )
 
 workflow = create_graph()

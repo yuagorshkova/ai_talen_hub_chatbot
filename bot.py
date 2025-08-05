@@ -25,7 +25,7 @@ async def handle_message(update: Update, _):
     logger.info(f"Message from user {user_id}: {user_message[:50]}...")  # Log first 50 chars
     
     try:
-        logger.debug("Invoking LangGraph...")
+        logger.info("Invoking LangGraph...")
         response = await workflow.ainvoke(
             {"messages": [HumanMessage(content=user_message)]},
             {"configurable": {"thread_id": str(user_id)}}
